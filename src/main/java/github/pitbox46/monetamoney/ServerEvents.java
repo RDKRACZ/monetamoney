@@ -6,21 +6,21 @@ import github.pitbox46.monetamoney.data.*;
 import github.pitbox46.monetamoney.items.Coin;
 import github.pitbox46.monetamoney.network.PacketHandler;
 import github.pitbox46.monetamoney.network.server.SDenyUseItem;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.ServerPlayerEntity;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.CompoundNBT;
-import net.minecraft.nbt.ListNBT;
-import net.minecraft.util.RegistryKey;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.registry.Registry;
-import net.minecraft.util.text.TranslationTextComponent;
-import net.minecraft.world.World;
-import net.minecraft.world.server.ServerWorld;
-import net.minecraft.world.storage.FolderName;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.AdvancementEvent;
@@ -31,12 +31,11 @@ import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.LogicalSide;
-import net.minecraftforge.fml.event.server.FMLServerStartingEvent;
-import net.minecraftforge.fml.event.server.FMLServerStoppingEvent;
-import net.minecraftforge.fml.network.PacketDistributor;
+import net.minecraftforge.fmllegacy.network.PacketDistributor;
+import net.minecraftforge.fmlserverevents.FMLServerStartingEvent;
+import net.minecraftforge.fmlserverevents.FMLServerStoppingEvent;
 
 import java.nio.file.Path;
-import java.sql.Time;
 import java.util.*;
 import java.util.function.Supplier;
 
@@ -45,7 +44,7 @@ public class ServerEvents {
 
     @SubscribeEvent
     public void onServerStarting(FMLServerStartingEvent event) {
-        Path modFolder = event.getServer().func_240776_a_(new FolderName("monetamoney"));
+        Path modFolder = event.getServer().getWorldPath(new LevelResource("monetamoney"));
         Ledger.init(modFolder);
         Outstanding.init(modFolder);
         LoadedChunks.init(modFolder);
@@ -74,12 +73,12 @@ public class ServerEvents {
 
     @SubscribeEvent
     public void onItemUse(PlayerInteractEvent.RightClickBlock event) {
-        if(event.getSide() == LogicalSide.SERVER && event.getPlayer().getHeldItem(event.getHand()).getItem() instanceof BlockItem && ((BlockItem) event.getPlayer().getHeldItem(event.getHand()).getItem()).getBlock().getClass() == Anchor.class) {
-            BlockPos pos = event.getPos().offset(event.getHitVec().getFace());
+        if(event.getSide() == LogicalSide.SERVER && event.getPlayer().getItemInHand(event.getHand()).getItem() instanceof BlockItem && ((BlockItem) event.getPlayer().getItemInHand(event.getHand()).getItem()).getBlock().getClass() == Anchor.class) {
+            BlockPos pos = event.getPos().relative(event.getHitVec().getDirection());
             for(List<ChunkLoader> values: ServerEvents.CHUNK_MAP.values()) {
-                if(values.stream().anyMatch(chunkLoader -> event.getWorld().getDimensionKey().getLocation().equals(chunkLoader.dimensionKey) && new ChunkPos(chunkLoader.pos).equals(new ChunkPos(pos)))) {
+                if(values.stream().anyMatch(chunkLoader -> event.getWorld().dimension().location().equals(chunkLoader.dimensionKey) && new ChunkPos(chunkLoader.pos).equals(new ChunkPos(pos)))) {
                     event.setUseItem(Event.Result.DENY);
-                    PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> (ServerPlayerEntity) event.getPlayer()), new SDenyUseItem(event.getHand(), event.getPlayer().getHeldItem(event.getHand())));
+                    PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> (ServerPlayer) event.getPlayer()), new SDenyUseItem(event.getHand(), event.getPlayer().getItemInHand(event.getHand())));
                     return;
                 }
             }
@@ -88,30 +87,30 @@ public class ServerEvents {
 
     @SubscribeEvent
     public void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
-        if(event.getEntity() instanceof ServerPlayerEntity && event.getPlacedBlock().getBlock().getClass() == Anchor.class) {
-            Team team = Teams.getPlayersTeam(Teams.jsonFile, ((PlayerEntity) event.getEntity()).getGameProfile().getName());
+        if(event.getEntity() instanceof ServerPlayer && event.getPlacedBlock().getBlock().getClass() == Anchor.class) {
+            Team team = Teams.getPlayersTeam(Teams.jsonFile, ((Player) event.getEntity()).getGameProfile().getName());
             String teamKey = team.isNull() ? "unlisted" : team.toString();
             ServerEvents.CHUNK_MAP.putIfAbsent(teamKey, new ArrayList<>());
-            ServerEvents.CHUNK_MAP.get(teamKey).add(new ChunkLoader(event.getEntity().world.getDimensionKey().getLocation(), event.getPos(), ((PlayerEntity) event.getEntity()).getGameProfile().getName(), ChunkLoader.Status.OFF));
+            ServerEvents.CHUNK_MAP.get(teamKey).add(new ChunkLoader(event.getEntity().level.dimension().location(), event.getPos(), ((Player) event.getEntity()).getGameProfile().getName(), ChunkLoader.Status.OFF));
         }
     }
 
     @SubscribeEvent
     public void onBlockBreak(BlockEvent.BreakEvent event) {
         if(event.getState().getBlock() instanceof IOnBreak) {
-            ((IOnBreak) event.getState().getBlock()).onBlockBreak((World) event.getWorld(), event.getPos());
+            ((IOnBreak) event.getState().getBlock()).onBlockBreak((Level) event.getWorld(), event.getPos());
         }
     }
 
     @SubscribeEvent
     public void onPlayerDeath(LivingDeathEvent event) {
-        if(event.getEntityLiving() instanceof PlayerEntity && event.getSource().getTrueSource() instanceof PlayerEntity) {
-            PlayerEntity dead = (PlayerEntity) event.getEntityLiving();
-            PlayerEntity attacker = (PlayerEntity) event.getSource().getTrueSource();
-            for(int i = 0; i < dead.inventory.getSizeInventory(); i++) {
-                if(dead.inventory.getStackInSlot(i).getItem() instanceof Coin) {
-                    ItemStack coin = dead.inventory.getStackInSlot(i);
-                    UUID uuid = coin.getOrCreateTag().getUniqueId("uuid");
+        if(event.getEntityLiving() instanceof Player && event.getSource().getEntity() instanceof Player) {
+            Player dead = (Player) event.getEntityLiving();
+            Player attacker = (Player) event.getSource().getEntity();
+            for(int i = 0; i < dead.getInventory().getContainerSize(); i++) {
+                if(dead.getInventory().getItem(i).getItem() instanceof Coin) {
+                    ItemStack coin = dead.getInventory().getItem(i);
+                    UUID uuid = coin.getOrCreateTag().getUUID("uuid");
                     if(Outstanding.isValidCoin(Outstanding.jsonFile, uuid)) {
                         return;
                     }
@@ -141,13 +140,13 @@ public class ServerEvents {
 
     /* Helper methods */
     public static void collectAuctionFees() {
-        ListNBT auctionList = (ListNBT) Auctioned.auctionedNBT.get("auction");
+        ListTag auctionList = (ListTag) Auctioned.auctionedNBT.get("auction");
         assert auctionList != null;
 
-        Map<String,Integer> itemsByPlayer = auctionList.stream().collect((Supplier<HashMap<String, Integer>>) HashMap::new, (map, inbt) -> map.put(((CompoundNBT) inbt).getString("owner"), map.getOrDefault(((CompoundNBT) inbt).getString("owner"), 0) + 1), HashMap::putAll);
+        Map<String,Integer> itemsByPlayer = auctionList.stream().collect((Supplier<HashMap<String, Integer>>) HashMap::new, (map, inbt) -> map.put(((CompoundTag) inbt).getString("owner"), map.getOrDefault(((CompoundTag) inbt).getString("owner"), 0) + 1), HashMap::putAll);
 
         auctionList.removeIf(inbt -> {
-            CompoundNBT nbt = (CompoundNBT) inbt;
+            CompoundTag nbt = (CompoundTag) inbt;
             long price = calculateDailyListCost(itemsByPlayer.getOrDefault(nbt.getString("owner"), 0));
             boolean flag = Ledger.readBalance(Ledger.jsonFile, nbt.getString("owner")) < price;
             if(!flag) Ledger.addBalance(Ledger.jsonFile, nbt.getString("owner"), -price);
@@ -155,8 +154,8 @@ public class ServerEvents {
         });
     }
 
-    public static void loadNewChunk(World world, Team team, ChunkLoader newChunk) {
-        ServerWorld serverWorld = world.getServer().getWorld(RegistryKey.getOrCreateKey(Registry.WORLD_KEY, newChunk.dimensionKey));
+    public static void loadNewChunk(Level world, Team team, ChunkLoader newChunk) {
+        ServerLevel serverWorld = world.getServer().getLevel(ResourceKey.create(Registry.DIMENSION_REGISTRY, newChunk.dimensionKey));
         long price = Config.BASE_CHUNKLOADER.get();
 
         Map<String,Integer> chunksByPlayer = CHUNK_MAP.values().stream().flatMap(Collection::stream).collect((Supplier<HashMap<String, Integer>>) HashMap::new, (map, chunkLoader) -> map.put(chunkLoader.owner, map.getOrDefault(chunkLoader.owner, 0) + 1), HashMap::putAll);
@@ -170,27 +169,27 @@ public class ServerEvents {
             }
         }
         if(newChunk.status == ChunkLoader.Status.ON) {
-            long chunkLong = new ChunkPos(newChunk.pos).asLong();
-            serverWorld.forceChunk(ChunkPos.getX(chunkLong), ChunkPos.getZ(chunkLong), newChunk.status == ChunkLoader.Status.ON && team.balance >= price);
-            if (serverWorld.getWorld().getForcedChunks().contains(chunkLong)) {
+            long chunkLong = new ChunkPos(newChunk.pos).toLong();
+            serverWorld.setChunkForced(ChunkPos.getX(chunkLong), ChunkPos.getZ(chunkLong), newChunk.status == ChunkLoader.Status.ON && team.balance >= price);
+            if (serverWorld.getLevel().getForcedChunks().contains(chunkLong)) {
                 if(team.balance >= price) {
                     team.balance -= (price);
                     newChunk.status = ChunkLoader.Status.ON;
-                    serverWorld.setBlockState(newChunk.pos, serverWorld.getBlockState(newChunk.pos).with(Anchor.STATUS, Anchor.Status.ON));
+                    serverWorld.setBlockAndUpdate(newChunk.pos, serverWorld.getBlockState(newChunk.pos).setValue(Anchor.STATUS, Anchor.Status.ON));
                 } else {
                     team.balance -= (price + Config.OVERDRAFT_FEE.get());
                     newChunk.status = ChunkLoader.Status.STUCK;
-                    serverWorld.setBlockState(newChunk.pos, serverWorld.getBlockState(newChunk.pos).with(Anchor.STATUS, Anchor.Status.STUCK));
+                    serverWorld.setBlockAndUpdate(newChunk.pos, serverWorld.getBlockState(newChunk.pos).setValue(Anchor.STATUS, Anchor.Status.STUCK));
                 }
                 Teams.updateTeam(Teams.jsonFile, team);
             } else {
                 newChunk.status = ChunkLoader.Status.OFF;
-                serverWorld.setBlockState(newChunk.pos, serverWorld.getBlockState(newChunk.pos).with(Anchor.STATUS, Anchor.Status.OFF));
+                serverWorld.setBlockAndUpdate(newChunk.pos, serverWorld.getBlockState(newChunk.pos).setValue(Anchor.STATUS, Anchor.Status.OFF));
             }
         }
     }
 
-    public static void loadAndPayChunks(World world) {
+    public static void loadAndPayChunks(Level world) {
         Map<String,Integer> chunksByPlayer = CHUNK_MAP.values().stream().flatMap(Collection::stream).collect((Supplier<HashMap<String, Integer>>) HashMap::new, (map, chunkLoader) -> map.put(chunkLoader.owner, map.getOrDefault(chunkLoader.owner, 0) + 1), HashMap::putAll);
 
         for(Map.Entry<String,List<ChunkLoader>> entry: CHUNK_MAP.entrySet()) {
@@ -200,7 +199,7 @@ public class ServerEvents {
             Iterator<ChunkLoader> iterator = entry.getValue().iterator();
             while(iterator.hasNext()) {
                 ChunkLoader chunkLoader = iterator.next();
-                ServerWorld serverWorld = world.getServer().getWorld(RegistryKey.getOrCreateKey(Registry.WORLD_KEY, chunkLoader.dimensionKey));
+                ServerLevel serverWorld = world.getServer().getLevel(ResourceKey.create(Registry.DIMENSION_REGISTRY, chunkLoader.dimensionKey));
                 if(serverWorld != null) {
                     //Should repair any issues with syncing between loaders list and the world
                     if(serverWorld.getBlockState(chunkLoader.pos).getBlock().getClass() != Anchor.class) {
@@ -211,22 +210,22 @@ public class ServerEvents {
                     Team team = Teams.getTeam(Teams.jsonFile, entry.getKey());
                     long price = calculateChunksCost(chunksByPlayer.getOrDefault(chunkLoader.owner, 0));
 
-                    long chunkLong = new ChunkPos(chunkLoader.pos).asLong();
-                    serverWorld.forceChunk(ChunkPos.getX(chunkLong), ChunkPos.getZ(chunkLong), chunkLoader.status == ChunkLoader.Status.ON && team.balance >= price);
-                    if (serverWorld.getWorld().getForcedChunks().contains(chunkLong)) {
+                    long chunkLong = new ChunkPos(chunkLoader.pos).toLong();
+                    serverWorld.setChunkForced(ChunkPos.getX(chunkLong), ChunkPos.getZ(chunkLong), chunkLoader.status == ChunkLoader.Status.ON && team.balance >= price);
+                    if (serverWorld.getLevel().getForcedChunks().contains(chunkLong)) {
                         if(team.balance >= price) {
                             team.balance -= (price);
                             chunkLoader.status = ChunkLoader.Status.ON;
-                            serverWorld.setBlockState(chunkLoader.pos, serverWorld.getBlockState(chunkLoader.pos).with(Anchor.STATUS, Anchor.Status.ON));
+                            serverWorld.setBlockAndUpdate(chunkLoader.pos, serverWorld.getBlockState(chunkLoader.pos).setValue(Anchor.STATUS, Anchor.Status.ON));
                         } else {
                             team.balance -= (price + Config.OVERDRAFT_FEE.get());
                             chunkLoader.status = ChunkLoader.Status.STUCK;
-                            serverWorld.setBlockState(chunkLoader.pos, serverWorld.getBlockState(chunkLoader.pos).with(Anchor.STATUS, Anchor.Status.STUCK));
+                            serverWorld.setBlockAndUpdate(chunkLoader.pos, serverWorld.getBlockState(chunkLoader.pos).setValue(Anchor.STATUS, Anchor.Status.STUCK));
                         }
                         Teams.updateTeam(Teams.jsonFile, team);
                     } else {
                         chunkLoader.status = ChunkLoader.Status.OFF;
-                        serverWorld.setBlockState(chunkLoader.pos, serverWorld.getBlockState(chunkLoader.pos).with(Anchor.STATUS, Anchor.Status.OFF));
+                        serverWorld.setBlockAndUpdate(chunkLoader.pos, serverWorld.getBlockState(chunkLoader.pos).setValue(Anchor.STATUS, Anchor.Status.OFF));
                     }
                 }
             }
@@ -257,17 +256,17 @@ public class ServerEvents {
         }
     }
 
-    public static void newPlayer(PlayerEntity entity) {
+    public static void newPlayer(Player entity) {
         if(Ledger.newPlayer(Ledger.jsonFile, entity.getGameProfile().getName(), Config.INITIAL_BAL.get())) {
-            entity.sendStatusMessage(new TranslationTextComponent("message.monetamoney.newplayer", Config.INITIAL_BAL.get()), false);
+            entity.displayClientMessage(new TranslatableComponent("message.monetamoney.newplayer", Config.INITIAL_BAL.get()), false);
         }
     }
 
-    public static void rewardCheck(PlayerEntity entity) {
+    public static void rewardCheck(Player entity) {
         if(System.currentTimeMillis() - Ledger.readLastReward(Ledger.jsonFile, entity.getGameProfile().getName()) > 86400000) {
             Ledger.updateLastReward(Ledger.jsonFile, entity.getGameProfile().getName());
             Ledger.addBalance(Ledger.jsonFile, entity.getGameProfile().getName(), Config.DAILY_REWARD.get());
-            entity.sendStatusMessage(new TranslationTextComponent("message.monetamoney.login_reward", Config.DAILY_REWARD.get()), false);
+            entity.displayClientMessage(new TranslatableComponent("message.monetamoney.login_reward", Config.DAILY_REWARD.get()), false);
         }
     }
 

@@ -4,7 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.minecraft.util.JSONUtils;
+import net.minecraft.util.GsonHelper;
 import net.minecraftforge.fml.loading.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -37,7 +37,7 @@ public class Outstanding {
 
     public static UUID newCoin(File jsonFile, long amount, String creator) {
         try (Reader reader = new FileReader(jsonFile)) {
-            JsonObject jsonObject = JSONUtils.fromJson(GSON, reader, JsonObject.class);
+            JsonObject jsonObject = GsonHelper.fromJson(GSON, reader, JsonObject.class);
             assert jsonObject != null;
 
             UUID uuid = new UUID(System.nanoTime(), Double.doubleToLongBits(Math.random()));
@@ -62,7 +62,7 @@ public class Outstanding {
         if(uuid == null)
             return false;
         try (Reader reader = new FileReader(jsonFile)) {
-            JsonObject jsonObject = JSONUtils.fromJson(GSON, reader, JsonObject.class);
+            JsonObject jsonObject = GsonHelper.fromJson(GSON, reader, JsonObject.class);
             assert jsonObject != null;
 
             JsonElement coinElement = jsonObject.remove(uuid.toString());
@@ -86,7 +86,7 @@ public class Outstanding {
         if(uuid == null)
             return false;
         try (Reader reader = new FileReader(jsonFile)) {
-            JsonObject jsonObject = JSONUtils.fromJson(GSON, reader, JsonObject.class);
+            JsonObject jsonObject = GsonHelper.fromJson(GSON, reader, JsonObject.class);
             assert jsonObject != null;
 
             JsonElement coinElement = jsonObject.remove(uuid.toString());
@@ -110,7 +110,7 @@ public class Outstanding {
         if(uuid == null)
             return false;
         try (Reader reader = new FileReader(jsonFile)) {
-            JsonObject jsonObject = JSONUtils.fromJson(GSON, reader, JsonObject.class);
+            JsonObject jsonObject = GsonHelper.fromJson(GSON, reader, JsonObject.class);
             assert jsonObject != null;
 
             JsonElement coinElement = jsonObject.get(uuid.toString());

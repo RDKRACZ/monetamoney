@@ -1,6 +1,5 @@
 package github.pitbox46.monetamoney.network.client;
 
-import github.pitbox46.monetamoney.Config;
 import github.pitbox46.monetamoney.ServerEvents;
 import github.pitbox46.monetamoney.containers.vault.AccountTransactionContainer;
 import github.pitbox46.monetamoney.containers.vault.AuctionHomeContainer;
@@ -10,23 +9,20 @@ import github.pitbox46.monetamoney.network.IPacket;
 import github.pitbox46.monetamoney.network.PacketHandler;
 import github.pitbox46.monetamoney.network.server.SSyncAuctionNBT;
 import github.pitbox46.monetamoney.network.server.SSyncFeesPacket;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.inventory.container.Container;
-import net.minecraft.inventory.container.INamedContainerProvider;
-import net.minecraft.nbt.CompoundNBT;
-import net.minecraft.nbt.ListNBT;
-import net.minecraft.network.PacketBuffer;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TranslationTextComponent;
-import net.minecraftforge.fml.network.NetworkEvent;
-import net.minecraftforge.fml.network.NetworkHooks;
-import net.minecraftforge.fml.network.PacketDistributor;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraftforge.fmllegacy.network.NetworkEvent;
+import net.minecraftforge.fmllegacy.network.NetworkHooks;
+import net.minecraftforge.fmllegacy.network.PacketDistributor;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 public class CPageChange implements IPacket {
     public short page;
@@ -40,13 +36,13 @@ public class CPageChange implements IPacket {
     }
 
     @Override
-    public void readPacketData(PacketBuffer buf) {
+    public void readPacketData(FriendlyByteBuf buf) {
         this.page = buf.readShort();
         this.subpage = buf.readInt();
     }
 
     @Override
-    public void writePacketData(PacketBuffer buf) {
+    public void writePacketData(FriendlyByteBuf buf) {
         buf.writeShort(this.page);
         buf.writeInt(this.subpage);
     }
@@ -63,33 +59,33 @@ public class CPageChange implements IPacket {
         switch(page) {
             //Change balance
             case 3: {
-                NetworkHooks.openGui(ctx.getSender(), new INamedContainerProvider() {
+                NetworkHooks.openGui(ctx.getSender(), new MenuProvider() {
                     @Override
-                    public ITextComponent getDisplayName() {
-                        return new TranslationTextComponent("screen.monetamoney.accounttransaction");
+                    public Component getDisplayName() {
+                        return new TranslatableComponent("screen.monetamoney.accounttransaction");
                     }
 
                     @Override
-                    public Container createMenu(int id, PlayerInventory inv, PlayerEntity player) {
+                    public AbstractContainerMenu createMenu(int id, Inventory inv, Player player) {
                         return new AccountTransactionContainer(id, inv);
                     }
                 });
             } break;
             //Auction
             case 5: case 6: {
-                if(ctx.getSender().openContainer instanceof AuctionHomeContainer) {
+                if(ctx.getSender().containerMenu instanceof AuctionHomeContainer) {
                     PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SSyncAuctionNBT(Auctioned.auctionedNBT));
-                    ((AuctionHomeContainer) ctx.getSender().openContainer).changePage(page == 6, subpage);
+                    ((AuctionHomeContainer) ctx.getSender().containerMenu).changePage(page == 6, subpage);
                 } else {
                     PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SSyncAuctionNBT(Auctioned.auctionedNBT));
-                    NetworkHooks.openGui(ctx.getSender(), new INamedContainerProvider() {
+                    NetworkHooks.openGui(ctx.getSender(), new MenuProvider() {
                         @Override
-                        public ITextComponent getDisplayName() {
-                            return new TranslationTextComponent("screen.monetamoney.auctionhome");
+                        public Component getDisplayName() {
+                            return new TranslatableComponent("screen.monetamoney.auctionhome");
                         }
 
                         @Override
-                        public Container createMenu(int id, PlayerInventory inv, PlayerEntity player) {
+                        public AbstractContainerMenu createMenu(int id, Inventory inv, Player player) {
                             return new AuctionHomeContainer(id, inv, page == 6, subpage);
                         }
                     }, buf -> buf.writeInt(this.subpage));
@@ -97,11 +93,11 @@ public class CPageChange implements IPacket {
             } break;
             //Auction list item
             case 7: {
-                ListNBT auctionList = (ListNBT) Auctioned.auctionedNBT.get("auction");
+                ListTag auctionList = (ListTag) Auctioned.auctionedNBT.get("auction");
                 assert auctionList != null;
 
                 int items = auctionList.stream().mapToInt((inbt) -> {
-                    CompoundNBT nbt = ((CompoundNBT) inbt);
+                    CompoundTag nbt = ((CompoundTag) inbt);
                     if(nbt.getString("owner").equals(player)) {
                         return 1;
                     }
@@ -114,14 +110,14 @@ public class CPageChange implements IPacket {
 
                 PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SSyncFeesPacket(price, dailyPrice));
                 PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SSyncAuctionNBT(Auctioned.auctionedNBT));
-                NetworkHooks.openGui(ctx.getSender(), new INamedContainerProvider() {
+                NetworkHooks.openGui(ctx.getSender(), new MenuProvider() {
                     @Override
-                    public ITextComponent getDisplayName() {
-                        return new TranslationTextComponent("screen.monetamoney.auctionlist");
+                    public Component getDisplayName() {
+                        return new TranslatableComponent("screen.monetamoney.auctionlist");
                     }
 
                     @Override
-                    public Container createMenu(int id, PlayerInventory inv, PlayerEntity player) {
+                    public AbstractContainerMenu createMenu(int id, Inventory inv, Player player) {
                         return new AuctionListItemContainer(id, inv);
                     }
                 });
@@ -129,7 +125,7 @@ public class CPageChange implements IPacket {
         }
     }
 
-    public static Function<PacketBuffer, CPageChange> decoder() {
+    public static Function<FriendlyByteBuf, CPageChange> decoder() {
         return pb -> {
             CPageChange packet = new CPageChange();
             packet.readPacketData(pb);

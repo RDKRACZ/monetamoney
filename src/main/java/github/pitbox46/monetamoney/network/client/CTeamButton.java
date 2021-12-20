@@ -1,7 +1,6 @@
 package github.pitbox46.monetamoney.network.client;
 
 import github.pitbox46.monetamoney.ServerEvents;
-import github.pitbox46.monetamoney.blocks.Anchor;
 import github.pitbox46.monetamoney.blocks.Vault;
 import github.pitbox46.monetamoney.data.Team;
 import github.pitbox46.monetamoney.data.Teams;
@@ -9,12 +8,11 @@ import github.pitbox46.monetamoney.network.IPacket;
 import github.pitbox46.monetamoney.network.PacketHandler;
 import github.pitbox46.monetamoney.network.server.SGuiStatusMessage;
 import github.pitbox46.monetamoney.network.server.SOpenTeamsPage;
-import github.pitbox46.monetamoney.network.server.SSyncFeesPacket;
-import net.minecraft.network.PacketBuffer;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.text.TranslationTextComponent;
-import net.minecraftforge.fml.network.NetworkEvent;
-import net.minecraftforge.fml.network.PacketDistributor;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraftforge.fmllegacy.network.NetworkEvent;
+import net.minecraftforge.fmllegacy.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,21 +30,21 @@ public class CTeamButton implements IPacket {
     }
 
     @Override
-    public void readPacketData(PacketBuffer buf) {
+    public void readPacketData(FriendlyByteBuf buf) {
         this.pos = buf.readBlockPos();
-        this.button = buf.readEnumValue(Button.class);
+        this.button = buf.readEnum(Button.class);
     }
 
     @Override
-    public void writePacketData(PacketBuffer buf) {
+    public void writePacketData(FriendlyByteBuf buf) {
         buf.writeBlockPos(this.pos);
-        buf.writeEnumValue(this.button);
+        buf.writeEnum(this.button);
     }
 
     @Override
     public void processPacket(NetworkEvent.Context ctx) {
-        if(ctx.getSender() != null &&ctx.getSender().getEntityWorld().getBlockState(this.pos).getBlock().getClass() == Vault.class) {
-            Team team = Teams.getTeam(Teams.jsonFile, ctx.getSender().getServerWorld().getDimensionKey().getLocation().toString() + this.pos.toLong());
+        if(ctx.getSender() != null &&ctx.getSender().getCommandSenderWorld().getBlockState(this.pos).getBlock().getClass() == Vault.class) {
+            Team team = Teams.getTeam(Teams.jsonFile, ctx.getSender().getLevel().dimension().location().toString() + this.pos.asLong());
             String player = ctx.getSender().getGameProfile().getName();
             switch (this.button) {
                 case OPENPAGE: {
@@ -70,7 +68,7 @@ public class CTeamButton implements IPacket {
 
                         PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SOpenTeamsPage(team, SOpenTeamsPage.Type.INSAME));
                     } else {
-                        PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SGuiStatusMessage(new TranslationTextComponent("message.monetamoney.error")));
+                        PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SGuiStatusMessage(new TranslatableComponent("message.monetamoney.error")));
                     }
                 } break;
                 case SWITCH: {
@@ -90,7 +88,7 @@ public class CTeamButton implements IPacket {
 
                         PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SOpenTeamsPage(team, SOpenTeamsPage.Type.INSAME));
                     } else {
-                        PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SGuiStatusMessage(new TranslationTextComponent("message.monetamoney.error")));
+                        PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SGuiStatusMessage(new TranslatableComponent("message.monetamoney.error")));
                     }
                 } break;
                 case LEAVE: {
@@ -103,12 +101,12 @@ public class CTeamButton implements IPacket {
 
                         PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SOpenTeamsPage(team, SOpenTeamsPage.Type.INNONE));
                     } else {
-                        PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SGuiStatusMessage(new TranslationTextComponent("message.monetamoney.error")));
+                        PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SGuiStatusMessage(new TranslatableComponent("message.monetamoney.error")));
                     }
                 } break;
                 case CREATE: {
                     if(team.isNull() && Teams.getPlayersTeam(Teams.jsonFile, player).isNull()) {
-                        team = new Team(this.pos, ctx.getSender().getServerWorld().getDimensionKey().getLocation(), player, Collections.singletonList(player), 0, false );
+                        team = new Team(this.pos, ctx.getSender().getLevel().dimension().location(), player, Collections.singletonList(player), 0, false );
                         Teams.newTeam(Teams.jsonFile, team);
 
                         ServerEvents.CHUNK_MAP.putIfAbsent(team.toString(), new ArrayList<>());
@@ -116,7 +114,7 @@ public class CTeamButton implements IPacket {
 
                         PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SOpenTeamsPage(team, SOpenTeamsPage.Type.INSAME));
                     } else {
-                        PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SGuiStatusMessage(new TranslationTextComponent("message.monetamoney.error")));
+                        PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SGuiStatusMessage(new TranslatableComponent("message.monetamoney.error")));
                     }
                 } break;
                 case REMOVE: {
@@ -128,7 +126,7 @@ public class CTeamButton implements IPacket {
 
                         PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SOpenTeamsPage(Team.NULL_TEAM, SOpenTeamsPage.Type.INNONE));
                     } else {
-                        PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SGuiStatusMessage(new TranslationTextComponent("message.monetamoney.error")));
+                        PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SGuiStatusMessage(new TranslatableComponent("message.monetamoney.error")));
                     }
                 } break;
                 case LOCK: {
@@ -147,7 +145,7 @@ public class CTeamButton implements IPacket {
         }
     }
 
-    public static Function<PacketBuffer, CTeamButton> decoder() {
+    public static Function<FriendlyByteBuf, CTeamButton> decoder() {
         return pb -> {
             CTeamButton packet = new CTeamButton();
             packet.readPacketData(pb);

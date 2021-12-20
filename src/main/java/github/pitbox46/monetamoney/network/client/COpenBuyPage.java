@@ -5,59 +5,58 @@ import github.pitbox46.monetamoney.data.Auctioned;
 import github.pitbox46.monetamoney.network.IPacket;
 import github.pitbox46.monetamoney.network.PacketHandler;
 import github.pitbox46.monetamoney.network.server.SSyncAuctionNBT;
-import github.pitbox46.monetamoney.network.server.SSyncFeesPacket;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.inventory.container.Container;
-import net.minecraft.inventory.container.INamedContainerProvider;
-import net.minecraft.nbt.CompoundNBT;
-import net.minecraft.network.PacketBuffer;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TranslationTextComponent;
-import net.minecraftforge.fml.network.NetworkEvent;
-import net.minecraftforge.fml.network.NetworkHooks;
-import net.minecraftforge.fml.network.PacketDistributor;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraftforge.fmllegacy.network.NetworkEvent;
+import net.minecraftforge.fmllegacy.network.NetworkHooks;
+import net.minecraftforge.fmllegacy.network.PacketDistributor;
 
 import java.util.function.Function;
 
 public class COpenBuyPage implements IPacket {
-    public CompoundNBT nbt;
+    public CompoundTag nbt;
 
     public COpenBuyPage() {}
 
-    public COpenBuyPage(CompoundNBT nbt) {
+    public COpenBuyPage(CompoundTag nbt) {
         this.nbt = nbt;
     }
 
     @Override
-    public void readPacketData(PacketBuffer buf) {
-        this.nbt = buf.readCompoundTag();
+    public void readPacketData(FriendlyByteBuf buf) {
+        this.nbt = buf.readNbt();
     }
 
     @Override
-    public void writePacketData(PacketBuffer buf) {
-        buf.writeCompoundTag(this.nbt);
+    public void writePacketData(FriendlyByteBuf buf) {
+        buf.writeNbt(this.nbt);
     }
 
     @Override
     public void processPacket(NetworkEvent.Context ctx) {
         if(ctx.getSender() == null) return;
-        CompoundNBT nbt = this.nbt;
+        CompoundTag nbt = this.nbt;
         PacketHandler.CHANNEL.send(PacketDistributor.PLAYER.with(ctx::getSender), new SSyncAuctionNBT(Auctioned.auctionedNBT));
-        NetworkHooks.openGui(ctx.getSender(), new INamedContainerProvider() {
+        NetworkHooks.openGui(ctx.getSender(), new MenuProvider() {
             @Override
-            public ITextComponent getDisplayName() {
-                return new TranslationTextComponent("screen.monetamoney.auctionbuy");
+            public Component getDisplayName() {
+                return new TranslatableComponent("screen.monetamoney.auctionbuy");
             }
 
             @Override
-            public Container createMenu(int id, PlayerInventory inv, PlayerEntity player) {
+            public AbstractContainerMenu createMenu(int id, Inventory inv, Player player) {
                 return new AuctionBuyContainer(id, inv, nbt);
             }
-        }, buf -> buf.writeCompoundTag(nbt));
+        }, buf -> buf.writeNbt(nbt));
     }
 
-    public static Function<PacketBuffer, COpenBuyPage> decoder() {
+    public static Function<FriendlyByteBuf, COpenBuyPage> decoder() {
         return pb -> {
             COpenBuyPage packet = new COpenBuyPage();
             packet.readPacketData(pb);

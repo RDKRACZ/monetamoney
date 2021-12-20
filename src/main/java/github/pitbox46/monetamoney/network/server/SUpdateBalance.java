@@ -1,10 +1,9 @@
 package github.pitbox46.monetamoney.network.server;
 
 import github.pitbox46.monetamoney.MonetaMoney;
-import github.pitbox46.monetamoney.network.ClientProxy;
 import github.pitbox46.monetamoney.network.IPacket;
-import net.minecraft.network.PacketBuffer;
-import net.minecraftforge.fml.network.NetworkEvent;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.fmllegacy.network.NetworkEvent;
 
 import java.util.function.Function;
 
@@ -24,7 +23,7 @@ public class SUpdateBalance implements IPacket {
     }
 
     @Override
-    public void readPacketData(PacketBuffer buf) {
+    public void readPacketData(FriendlyByteBuf buf) {
         this.personalBal = buf.readLong();
         this.teamBal = buf.readLong();
         this.dailyChunks = buf.readLong();
@@ -32,7 +31,7 @@ public class SUpdateBalance implements IPacket {
     }
 
     @Override
-    public void writePacketData(PacketBuffer buf) {
+    public void writePacketData(FriendlyByteBuf buf) {
         buf.writeLong(this.personalBal);
         buf.writeLong(this.teamBal);
         buf.writeLong(this.dailyChunks);
@@ -44,7 +43,7 @@ public class SUpdateBalance implements IPacket {
         MonetaMoney.PROXY.handleSUpdateBalance(ctx, this);
     }
 
-    public static Function<PacketBuffer,SUpdateBalance> decoder() {
+    public static Function<FriendlyByteBuf,SUpdateBalance> decoder() {
         return pb -> {
             SUpdateBalance packet = new SUpdateBalance();
             packet.readPacketData(pb);

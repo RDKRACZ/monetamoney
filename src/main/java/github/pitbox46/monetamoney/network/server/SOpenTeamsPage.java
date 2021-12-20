@@ -3,10 +3,8 @@ package github.pitbox46.monetamoney.network.server;
 import github.pitbox46.monetamoney.MonetaMoney;
 import github.pitbox46.monetamoney.data.Team;
 import github.pitbox46.monetamoney.network.IPacket;
-import github.pitbox46.monetamoney.screen.vault.TeamsPage;
-import net.minecraft.client.Minecraft;
-import net.minecraft.network.PacketBuffer;
-import net.minecraftforge.fml.network.NetworkEvent;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.fmllegacy.network.NetworkEvent;
 
 import java.util.function.Function;
 
@@ -22,15 +20,15 @@ public class SOpenTeamsPage implements IPacket {
     }
 
     @Override
-    public void readPacketData(PacketBuffer buf) {
+    public void readPacketData(FriendlyByteBuf buf) {
         this.team = Team.readTeam(buf);
-        this.type = buf.readEnumValue(Type.class);
+        this.type = buf.readEnum(Type.class);
     }
 
     @Override
-    public void writePacketData(PacketBuffer buf) {
+    public void writePacketData(FriendlyByteBuf buf) {
         this.team.writeTeam(buf);
-        buf.writeEnumValue(this.type);
+        buf.writeEnum(this.type);
     }
 
     @Override
@@ -38,7 +36,7 @@ public class SOpenTeamsPage implements IPacket {
         MonetaMoney.PROXY.handleSOpenTeamsPage(ctx, this);
     }
 
-    public static Function<PacketBuffer,SOpenTeamsPage> decoder() {
+    public static Function<FriendlyByteBuf,SOpenTeamsPage> decoder() {
         return pb -> {
             SOpenTeamsPage packet = new SOpenTeamsPage();
             packet.readPacketData(pb);

@@ -2,10 +2,8 @@ package github.pitbox46.monetamoney.network.server;
 
 import github.pitbox46.monetamoney.MonetaMoney;
 import github.pitbox46.monetamoney.network.IPacket;
-import github.pitbox46.monetamoney.screen.AnchorScreen;
-import net.minecraft.client.Minecraft;
-import net.minecraft.network.PacketBuffer;
-import net.minecraftforge.fml.network.NetworkEvent;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.fmllegacy.network.NetworkEvent;
 
 import java.util.function.Function;
 
@@ -19,12 +17,12 @@ public class SOpenAnchorPage implements IPacket {
     }
 
     @Override
-    public void readPacketData(PacketBuffer buf) {
+    public void readPacketData(FriendlyByteBuf buf) {
         this.active = buf.readBoolean();
     }
 
     @Override
-    public void writePacketData(PacketBuffer buf) {
+    public void writePacketData(FriendlyByteBuf buf) {
         buf.writeBoolean(this.active);
     }
 
@@ -33,7 +31,7 @@ public class SOpenAnchorPage implements IPacket {
         MonetaMoney.PROXY.handleSOpenAnchorPage(ctx, this);
     }
 
-    public static Function<PacketBuffer,SOpenAnchorPage> decoder() {
+    public static Function<FriendlyByteBuf,SOpenAnchorPage> decoder() {
         return pb -> {
             SOpenAnchorPage packet = new SOpenAnchorPage();
             packet.readPacketData(pb);

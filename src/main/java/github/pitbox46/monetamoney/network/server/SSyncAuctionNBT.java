@@ -1,31 +1,30 @@
 package github.pitbox46.monetamoney.network.server;
 
 import github.pitbox46.monetamoney.MonetaMoney;
-import github.pitbox46.monetamoney.data.Auctioned;
 import github.pitbox46.monetamoney.network.IPacket;
-import net.minecraft.nbt.CompoundNBT;
-import net.minecraft.network.PacketBuffer;
-import net.minecraftforge.fml.network.NetworkEvent;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.fmllegacy.network.NetworkEvent;
 
 import java.util.function.Function;
 
 public class SSyncAuctionNBT implements IPacket {
-    public CompoundNBT nbt;
+    public CompoundTag nbt;
 
     public SSyncAuctionNBT() {}
 
-    public SSyncAuctionNBT(CompoundNBT nbt) {
+    public SSyncAuctionNBT(CompoundTag nbt) {
         this.nbt = nbt;
     }
 
     @Override
-    public void readPacketData(PacketBuffer buf) {
-        this.nbt = buf.readCompoundTag();
+    public void readPacketData(FriendlyByteBuf buf) {
+        this.nbt = buf.readNbt();
     }
 
     @Override
-    public void writePacketData(PacketBuffer buf) {
-        buf.writeCompoundTag(nbt);
+    public void writePacketData(FriendlyByteBuf buf) {
+        buf.writeNbt(nbt);
     }
 
     @Override
@@ -33,7 +32,7 @@ public class SSyncAuctionNBT implements IPacket {
         MonetaMoney.PROXY.handleSSyncAuctionNBT(ctx, this);
     }
 
-    public static Function<PacketBuffer,SSyncAuctionNBT> decoder() {
+    public static Function<FriendlyByteBuf,SSyncAuctionNBT> decoder() {
         return pb -> {
             SSyncAuctionNBT packet = new SSyncAuctionNBT();
             packet.readPacketData(pb);

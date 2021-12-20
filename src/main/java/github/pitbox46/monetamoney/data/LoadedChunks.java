@@ -1,16 +1,13 @@
 package github.pitbox46.monetamoney.data;
 
 import com.google.gson.*;
-import net.minecraft.util.JSONUtils;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.GsonHelper;
 import net.minecraftforge.fml.loading.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.*;
 import java.nio.file.Path;
-import java.sql.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +35,7 @@ public class LoadedChunks {
 
     public static Map<String, List<ChunkLoader>> read(File jsonFile) {
         try (Reader reader = new FileReader(jsonFile)) {
-            JsonObject jsonObject = JSONUtils.fromJson(GSON, reader, JsonObject.class);
+            JsonObject jsonObject = GsonHelper.fromJson(GSON, reader, JsonObject.class);
             assert jsonObject != null;
 
             Map<String, List<ChunkLoader>> returnMap = new HashMap<>();
